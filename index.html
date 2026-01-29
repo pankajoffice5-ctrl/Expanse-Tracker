@@ -3,52 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expanse Trac | Multi-User</title>
+    <title>Expanse Trac | Smart Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans">
 
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6 text-center">
-        <div class="bg-white p-8 rounded-3xl max-w-sm w-full">
-            <h2 class="text-3xl font-black mb-2">Welcome</h2>
-            <p class="text-slate-500 mb-6">Login to start tracking your personal expenses safely.</p>
-            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition">
+        <div class="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl">
+            <h2 class="text-3xl font-black mb-2 text-slate-800">Welcome</h2>
+            <p class="text-slate-500 mb-6">Login to track your monthly & yearly spending.</p>
+            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all">
                 Sign in with Google
             </button>
         </div>
     </div>
 
     <div id="app-content" class="hidden max-w-md mx-auto pb-20">
-        <header class="bg-white border-b p-6 sticky top-0 z-10 flex justify-between items-center">
+        
+        <header class="bg-white border-b p-6 sticky top-0 z-10 flex justify-between items-center shadow-sm">
             <div>
                 <h1 class="text-xl font-black text-blue-600">Expanse Trac</h1>
                 <button id="logout-btn" class="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1">Logout</button>
             </div>
             <div class="text-right">
-                <p class="text-[10px] font-bold text-slate-400 uppercase">My Total</p>
+                <p class="text-[10px] font-bold text-slate-400 uppercase">Total Lifetime</p>
                 <h2 id="total-amount" class="text-xl font-black text-slate-800">$0.00</h2>
             </div>
         </header>
 
-        <section class="p-4">
-            <div class="bg-white rounded-2xl border p-5">
+        <section class="p-4 grid grid-cols-2 gap-3">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase">This Month</p>
+                <h3 id="monthly-total" class="text-lg font-black text-blue-600">$0.00</h3>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <p class="text-[10px] font-bold text-slate-400 uppercase">This Year</p>
+                <h3 id="yearly-total" class="text-lg font-black text-slate-800">$0.00</h3>
+            </div>
+        </section>
+
+        <section class="px-4 pb-4">
+            <div class="bg-white rounded-2xl border p-5 shadow-sm">
                 <form id="expense-form" class="space-y-4">
                     <div class="grid grid-cols-2 gap-3">
-                        <select id="category" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
+                        <select id="category" class="bg-slate-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="Food">🍔 Food</option>
                             <option value="Transport">🚗 Transport</option>
                             <option value="Bills">⚡ Bills</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
                             <option value="Other">📦 Other</option>
                         </select>
-                        <input type="number" step="0.01" id="amount" placeholder="0.00" class="bg-slate-50 rounded-xl p-3 text-sm" required>
+                        <input type="number" step="0.01" id="amount" placeholder="0.00" class="bg-slate-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
                     </div>
-                    <input type="text" id="desc" placeholder="Description" class="w-full bg-slate-50 rounded-xl p-3 text-sm" required>
-                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl">Add Expense</button>
+                    <input type="text" id="desc" placeholder="What was this for?" class="w-full bg-slate-50 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all">Add Expense</button>
                 </form>
             </div>
         </section>
 
-        <section id="expense-list" class="px-4 space-y-3"></section>
+        <section class="px-4">
+            <p class="text-[10px] font-bold text-slate-400 uppercase mb-3 ml-1 tracking-widest">Recent Transactions</p>
+            <div id="expense-list" class="space-y-3"></div>
+        </section>
     </div>
 
     <script type="module">
@@ -73,9 +89,8 @@
         const provider = new GoogleAuthProvider();
 
         let currentUser = null;
-        let unsubscribe = null; // To stop listening when logged out
+        let unsubscribe = null;
 
-        // --- AUTH LOGIC ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
@@ -93,43 +108,91 @@
         document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
         document.getElementById('logout-btn').onclick = () => signOut(auth);
 
-        // --- DATA LOGIC ---
         function loadUserData(uid) {
-            // ONLY query data where userId == logged in user's ID
             const q = query(collection(db, 'expenses'), where("userId", "==", uid), orderBy('createdAt', 'desc'));
             
             unsubscribe = onSnapshot(q, (snapshot) => {
-                let total = 0;
+                let lifetimeTotal = 0;
+                let monthlyTotal = 0;
+                let yearlyTotal = 0;
                 let html = '';
+
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+
                 snapshot.docs.forEach(doc => {
                     const item = doc.data();
-                    total += item.amount;
-                    html += `<div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
-                        <div class="text-sm font-bold">${item.description} <br><span class="text-[10px] text-slate-400">${item.category}</span></div>
-                        <div class="flex items-center gap-4">
-                            <span class="font-black">$${item.amount.toFixed(2)}</span>
-                            <button onclick="deleteItem('${doc.id}')" class="text-slate-300 hover:text-red-500 font-bold">✕</button>
-                        </div>
-                    </div>`;
+                    const date = item.createdAt ? item.createdAt.toDate() : new Date();
+                    const amount = parseFloat(item.amount);
+
+                    // Math Logic
+                    lifetimeTotal += amount;
+                    if (date.getFullYear() === currentYear) {
+                        yearlyTotal += amount;
+                        if (date.getMonth() === currentMonth) {
+                            monthlyTotal += amount;
+                        }
+                    }
+
+                    // Format Date for Stamp
+                    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+                    html += `
+                        <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-slate-50 text-[10px] font-bold p-2 rounded-lg text-slate-400 text-center leading-tight">
+                                    ${dateStr.split(' ')[0]}<br>${dateStr.split(' ')[1]}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-800">${item.description}</p>
+                                    <p class="text-[10px] text-slate-400 font-medium">${item.category}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <span class="font-black text-slate-900">$${amount.toFixed(2)}</span>
+                                <button onclick="deleteItem('${doc.id}')" class="text-slate-200 hover:text-red-500 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>`;
                 });
-                document.getElementById('expense-list').innerHTML = html;
-                document.getElementById('total-amount').textContent = `$${total.toFixed(2)}`;
+
+                document.getElementById('expense-list').innerHTML = html || '<p class="text-center text-slate-400 text-xs py-10">No expenses found.</p>';
+                document.getElementById('total-amount').textContent = `$${lifetimeTotal.toFixed(2)}`;
+                document.getElementById('monthly-total').textContent = `$${monthlyTotal.toFixed(2)}`;
+                document.getElementById('yearly-total').textContent = `$${yearlyTotal.toFixed(2)}`;
             });
         }
 
         document.getElementById('expense-form').onsubmit = async (e) => {
             e.preventDefault();
-            await addDoc(collection(db, 'expenses'), {
-                userId: currentUser.uid, // TAG THE DATA WITH THE USER ID
-                category: document.getElementById('category').value,
-                description: document.getElementById('desc').value,
-                amount: parseFloat(document.getElementById('amount').value),
-                createdAt: new Date()
-            });
-            e.target.reset();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = 'Adding...';
+
+            try {
+                await addDoc(collection(db, 'expenses'), {
+                    userId: currentUser.uid,
+                    category: document.getElementById('category').value,
+                    description: document.getElementById('desc').value,
+                    amount: parseFloat(document.getElementById('amount').value),
+                    createdAt: new Date()
+                });
+                e.target.reset();
+            } catch (err) {
+                alert("Error adding expense. Check your internet.");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Add Expense';
+            }
         };
 
-        window.deleteItem = (id) => deleteDoc(doc(db, 'expenses', id));
+        window.deleteItem = (id) => {
+            if(confirm("Delete this entry?")) deleteDoc(doc(db, 'expenses', id));
+        };
     </script>
 </body>
 </html>
