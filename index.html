@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expanse Trac | Smart Categorization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+
+    <div class="max-w-4xl mx-auto py-10 px-4">
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">Expanse Trac</h1>
+            <p class="text-slate-500 mt-2">Organize your spending by category</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+            <form id="expense-form" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="md:col-span-1">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Category</label>
+                    <select id="category" class="w-full border-slate-200 border rounded-lg p-2.5 bg-white outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Food">🍔 Food</option>
+                        <option value="Transport">🚗 Transport</option>
+                        <option value="Bills">⚡ Bills</option>
+                        <option value="Entertainment">🎬 Entertainment</option>
+                        <option value="Other">📦 Other</option>
+                    </select>
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Description</label>
+                    <input type="text" id="desc" placeholder="Details..." 
+                           class="w-full border-slate-200 border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Amount</label>
+                    <input type="number" step="0.01" id="amount" placeholder="0.00" 
+                           class="w-full border-slate-200 border rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 active:scale-95 transition-all">
+                        Add Item
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-blue-600 rounded-2xl p-6 text-white shadow-lg">
+                <p class="text-blue-100 text-sm font-medium">Total Spent</p>
+                <h2 id="total-amount" class="text-3xl font-bold mt-1">$0.00</h2>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200">
+                <p class="text-slate-500 text-sm font-medium">Most Frequent</p>
+                <h2 id="top-category" class="text-2xl font-bold text-slate-800 mt-1">—</h2>
+            </div>
+            <div class="bg-white rounded-2xl p-6 border border-slate-200">
+                <p class="text-slate-500 text-sm font-medium">Entries</p>
+                <h2 id="count" class="text-2xl font-bold text-slate-800 mt-1">0</h2>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                        <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase">Category & Item</th>
+                        <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase text-right">Amount</th>
+                        <th class="py-4 px-6 text-xs font-bold text-slate-500 uppercase text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="expense-list" class="divide-y divide-slate-100"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } 
+               from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDd-I_OFsCNreuUVbtfUFK-2IDGkhqHAE",
+            authDomain: "expanse-trac-e3e40.firebaseapp.com",
+            projectId: "expanse-trac-e3e40",
+            storageBucket: "expanse-trac-e3e40.firebasestorage.app",
+            messagingSenderId: "716119679836",
+            appId: "1:716119679836:web:6b4531be1aa9e41e5d1799",
+            measurementId: "G-BJWX0L0MQF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const colRef = collection(db, 'expenses');
+
+        const form = document.getElementById('expense-form');
+        const list = document.getElementById('expense-list');
+
+        // Color map for categories
+        const colors = {
+            Food: 'bg-orange-100 text-orange-700',
+            Transport: 'bg-purple-100 text-purple-700',
+            Bills: 'bg-red-100 text-red-700',
+            Entertainment: 'bg-green-100 text-green-700',
+            Other: 'bg-gray-100 text-gray-700'
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await addDoc(colRef, {
+                category: document.getElementById('category').value,
+                description: document.getElementById('desc').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                createdAt: new Date()
+            });
+            form.reset();
+        });
+
+        onSnapshot(query(colRef, orderBy('createdAt', 'desc')), (snapshot) => {
+            let total = 0;
+            let html = '';
+            let catCounts = {};
+
+            snapshot.docs.forEach(doc => {
+                const item = doc.data();
+                total += item.amount;
+                catCounts[item.category] = (catCounts[item.category] || 0) + 1;
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-4 px-6">
+                            <span class="px-2 py-1 rounded text-xs font-bold ${colors[item.category] || colors.Other} mr-3">
+                                ${item.category}
+                            </span>
+                            <span class="text-slate-700 font-medium">${item.description}</span>
+                        </td>
+                        <td class="py-4 px-6 text-right font-bold text-slate-900">$${item.amount.toFixed(2)}</td>
+                        <td class="py-4 px-6 text-center">
+                            <button onclick="deleteItem('${doc.id}')" class="text-slate-300 hover:text-red-500 transition">✕</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            list.innerHTML = html;
+            document.getElementById('total-amount').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('count').textContent = snapshot.size;
+            
+            // Find top category
+            const topCat = Object.keys(catCounts).reduce((a, b) => catCounts[a] > catCounts[b] ? a : b, '—');
+            document.getElementById('top-category').textContent = topCat;
+        });
+
+        window.deleteItem = async (id) => {
+            if(confirm('Delete?')) await deleteDoc(doc(db, 'expenses', id));
+        };
+    </script>
+</body>
+</html>
