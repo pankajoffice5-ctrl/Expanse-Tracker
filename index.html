@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expanse Trac | Analytics</title>
+    <title>Expanse Tracker | 3-Month Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans">
 
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6 text-center">
-        <div class="bg-white p-8 rounded-3xl max-w-sm w-full">
-            <h2 class="text-3xl font-black mb-2">Welcome</h2>
-            <p class="text-slate-500 mb-6">Login to see your spending analytics.</p>
-            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition">
+        <div class="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl">
+            <h2 class="text-3xl font-black mb-2 text-slate-800">Welcome to Smart Calc</h2>
+            <p class="text-slate-500 mb-6">Login to track spending trends.</p>
+            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all">
                 Sign in with Google
             </button>
         </div>
@@ -26,55 +26,71 @@
                 <button id="logout-btn" class="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1">Logout</button>
             </div>
             <div class="text-right">
-                <p class="text-[10px] font-bold text-slate-400 uppercase">Monthly Total</p>
-                <h2 id="monthly-total" class="text-xl font-black text-slate-800">$0.00</h2>
+                <p class="text-[10px] font-bold text-slate-400 uppercase">Lifetime Spend</p>
+                <h2 id="total-amount" class="text-xl font-black text-slate-800">$0.00</h2>
             </div>
         </header>
 
-        <section class="p-4">
-            <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative">
-                <p class="text-[10px] font-bold text-slate-400 uppercase mb-4 text-center tracking-widest">Spending Breakdown</p>
-                <div class="max-w-[200px] mx-auto">
+        <section class="p-4 grid grid-cols-3 gap-2">
+            <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm text-center">
+                <p id="m2-name" class="text-[9px] font-bold text-slate-400 uppercase">--</p>
+                <h3 id="m2-total" class="text-sm font-black text-slate-700">$0</h3>
+            </div>
+            <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm text-center border-b-4 border-b-blue-200">
+                <p id="m1-name" class="text-[9px] font-bold text-slate-400 uppercase">--</p>
+                <h3 id="m1-total" class="text-sm font-black text-slate-700">$0</h3>
+            </div>
+            <div class="bg-blue-600 p-3 rounded-2xl shadow-md text-center text-white">
+                <p class="text-[9px] font-bold uppercase opacity-80">This Month</p>
+                <h3 id="curr-total" class="text-sm font-black">$0</h3>
+            </div>
+        </section>
+
+        <section class="px-4 mb-4">
+            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+                <div class="max-w-[160px] mx-auto">
                     <canvas id="expenseChart"></canvas>
-                </div>
-                <div id="filter-status" class="hidden mt-4 text-center">
-                    <button id="clear-filter" class="text-[10px] bg-slate-100 px-3 py-1 rounded-full font-bold text-slate-500 uppercase hover:bg-red-50 hover:text-red-500 transition">
-                        Showing <span id="active-category"></span> ✕
-                    </button>
                 </div>
             </div>
         </section>
 
         <section class="px-4 pb-4">
             <div class="bg-white rounded-2xl border p-5 shadow-sm">
-                <form id="expense-form" class="space-y-4">
+                <form id="expense-form" class="space-y-3">
                     <div class="grid grid-cols-2 gap-3">
                         <select id="category" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
-                            <option value="Food">🍔 Food</option>
-                            <option value="Transport">🚗 Transport</option>
-                            <option value="Bills">⚡ Bills</option>
-                            <option value="Fun">🎬 Fun</option>
+                            <option value="Grocery">🛒 Grocery</option>
+                            <option value="Medical">🏥 Medical</option>
+                            <option value="Shopping">🛍️ Shopping</option>
+                            <option value="Food & Drink">🍽️ Food & Drink</option>
+                            <option value="Water">💧 Water</option>
+                            <option value="Gas">🔥 Gas</option>
+                            <option value="Transportation">🚌 Transportation</option>
+                            <option value="Rent">🏠 Rent</option>
+                            <option value="Phone & Internet">📱 Phone & Internet</option>
+                            <option value="Cloths">👕 Cloths</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Nevta">🎁 Nevta</option>
                             <option value="Other">📦 Other</option>
                         </select>
-                        <input type="number" step="0.01" id="amount" placeholder="0.00" class="bg-slate-50 rounded-xl p-3 text-sm" required>
+                        <input type="date" id="exp-date" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
                     </div>
-                    <input type="text" id="desc" placeholder="Description" class="w-full bg-slate-50 rounded-xl p-3 text-sm" required>
+                    <div class="grid grid-cols-3 gap-3">
+                        <input type="number" step="0.01" id="amount" placeholder="0.00" class="col-span-1 bg-slate-50 rounded-xl p-3 text-sm" required>
+                        <input type="text" id="desc" placeholder="Description" class="col-span-2 bg-slate-50 rounded-xl p-3 text-sm" required>
+                    </div>
                     <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all">Add Expense</button>
                 </form>
             </div>
         </section>
 
-        <section class="px-4">
-            <div id="expense-list" class="space-y-3"></div>
-        </section>
+        <section id="expense-list" class="px-4 space-y-3"></section>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where } 
-               from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } 
-               from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCDd-I_OFsCNreuUVbtfUFK-2IDGkhqHAE",
@@ -90,120 +106,135 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        let currentUser = null;
-        let unsubscribe = null;
         let myChart = null;
-        let filterCategory = null; // Current filter
+        let currentUser = null;
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('app-content').classList.remove('hidden');
-                initChart();
-                loadUserData(user.uid);
-            } else {
-                currentUser = null;
-                document.getElementById('login-screen').classList.remove('hidden');
-                document.getElementById('app-content').classList.add('hidden');
-                if(unsubscribe) unsubscribe();
-            }
-        });
+        // --- DEV TOGGLE: Change to 'true' to skip login for local design work ---
+        const BYPASS_LOGIN = false; 
 
-        document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
-        document.getElementById('logout-btn').onclick = () => signOut(auth);
+        document.getElementById('exp-date').valueAsDate = new Date();
 
-        function initChart() {
-            const ctx = document.getElementById('expenseChart').getContext('2d');
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    cutout: '70%',
-                    plugins: { legend: { display: false } },
-                    onClick: (evt, elements) => {
-                        if (elements.length > 0) {
-                            const index = elements[0].index;
-                            filterCategory = myChart.data.labels[index];
-                            document.getElementById('filter-status').classList.remove('hidden');
-                            document.getElementById('active-category').innerText = filterCategory;
-                            loadUserData(currentUser.uid); // Reload list with filter
-                        }
-                    }
+        // Handle Login Bypass or Real Auth
+        if (BYPASS_LOGIN) {
+            currentUser = { uid: "test_user_local" };
+            setupUI();
+        } else {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    setupUI();
+                } else {
+                    document.getElementById('login-screen').classList.remove('hidden');
+                    document.getElementById('app-content').classList.add('hidden');
                 }
             });
         }
 
-        document.getElementById('clear-filter').onclick = () => {
-            filterCategory = null;
-            document.getElementById('filter-status').classList.add('hidden');
+        function setupUI() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            initChart();
             loadUserData(currentUser.uid);
-        };
+        }
+
+        document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
+        document.getElementById('logout-btn').onclick = () => BYPASS_LOGIN ? location.reload() : signOut(auth);
+
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            if (myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }] },
+                options: { cutout: '75%', plugins: { legend: { display: false } } }
+            });
+        }
 
         function loadUserData(uid) {
             const q = query(collection(db, 'expenses'), where("userId", "==", uid), orderBy('createdAt', 'desc'));
             
-            if(unsubscribe) unsubscribe();
-
-            unsubscribe = onSnapshot(q, (snapshot) => {
-                let total = 0;
+            onSnapshot(q, (snapshot) => {
+                let totals = { lifetime: 0, current: 0, last1: 0, last2: 0 };
+                let catTotals = {};
                 let html = '';
-                const categoryTotals = {};
+
+                const now = new Date();
+                const m0 = now.getMonth(), y0 = now.getFullYear();
+                
+                // Better month calculation to avoid "31st" date errors
+                const dateM1 = new Date(y0, m0 - 1, 1);
+                const m1 = dateM1.getMonth(), y1 = dateM1.getFullYear();
+                
+                const dateM2 = new Date(y0, m0 - 2, 1);
+                const m2 = dateM2.getMonth(), y2 = dateM2.getFullYear();
+
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                document.getElementById('m1-name').innerText = monthNames[m1];
+                document.getElementById('m2-name').innerText = monthNames[m2];
 
                 snapshot.docs.forEach(doc => {
                     const item = doc.data();
-                    const amount = parseFloat(item.amount);
+                    const amount = parseFloat(item.amount) || 0;
+                    const date = item.createdAt.toDate();
                     
-                    // Always calculate totals for the chart based on current month
-                    categoryTotals[item.category] = (categoryTotals[item.category] || 0) + amount;
-                    total += amount;
+                    totals.lifetime += amount;
 
-                    // Apply UI filter to the list
-                    if (!filterCategory || item.category === filterCategory) {
-                        html += `
+                    if (date.getMonth() === m0 && date.getFullYear() === y0) {
+                        totals.current += amount;
+                        catTotals[item.category] = (catTotals[item.category] || 0) + amount;
+                    } else if (date.getMonth() === m1 && date.getFullYear() === y1) {
+                        totals.last1 += amount;
+                    } else if (date.getMonth() === m2 && date.getFullYear() === y2) {
+                        totals.last2 += amount;
+                    }
+
+                    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+                    html += `
                         <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100">
-                            <div class="text-sm font-bold text-slate-800">${item.description} <br><span class="text-[10px] text-slate-400 uppercase">${item.category}</span></div>
+                            <div class="flex items-center gap-3">
+                                <div class="bg-slate-100 text-[9px] font-bold p-2 rounded-lg text-slate-500 text-center uppercase">${dateStr.replace(' ', '<br>')}</div>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-800">${item.description}</p>
+                                    <p class="text-[10px] text-slate-400 uppercase tracking-tighter">${item.category}</p>
+                                </div>
+                            </div>
                             <div class="flex items-center gap-4">
-                                <span class="font-black">$${amount.toFixed(2)}</span>
+                                <span class="font-black text-slate-900">$${amount.toFixed(2)}</span>
                                 <button onclick="deleteItem('${doc.id}')" class="text-slate-200 hover:text-red-500">✕</button>
                             </div>
                         </div>`;
-                    }
                 });
 
-                updateChart(categoryTotals);
-                document.getElementById('expense-list').innerHTML = html || '<p class="text-center text-slate-400 py-10">No items in this category.</p>';
-                document.getElementById('monthly-total').textContent = `$${total.toFixed(2)}`;
+                document.getElementById('expense-list').innerHTML = html || '<p class="text-center text-slate-400 py-10 text-sm">No expenses yet.</p>';
+                document.getElementById('total-amount').innerText = `$${totals.lifetime.toFixed(2)}`;
+                document.getElementById('curr-total').innerText = `$${Math.round(totals.current)}`;
+                document.getElementById('m1-total').innerText = `$${Math.round(totals.last1)}`;
+                document.getElementById('m2-total').innerText = `$${Math.round(totals.last2)}`;
+                
+                myChart.data.labels = Object.keys(catTotals);
+                myChart.data.datasets[0].data = Object.values(catTotals);
+                myChart.update();
             });
-        }
-
-        function updateChart(totals) {
-            myChart.data.labels = Object.keys(totals);
-            myChart.data.datasets[0].data = Object.values(totals);
-            myChart.update();
         }
 
         document.getElementById('expense-form').onsubmit = async (e) => {
             e.preventDefault();
+            const selectedDate = new Date(document.getElementById('exp-date').value);
+            selectedDate.setHours(new Date().getHours(), new Date().getMinutes());
+
             await addDoc(collection(db, 'expenses'), {
                 userId: currentUser.uid,
                 category: document.getElementById('category').value,
                 description: document.getElementById('desc').value,
                 amount: parseFloat(document.getElementById('amount').value),
-                createdAt: new Date()
+                createdAt: Timestamp.fromDate(selectedDate)
             });
             e.target.reset();
+            document.getElementById('exp-date').valueAsDate = new Date();
         };
 
-        window.deleteItem = (id) => deleteDoc(doc(db, 'expenses', id));
+        window.deleteItem = (id) => { if(confirm("Delete this item?")) deleteDoc(doc(db, 'expenses', id)); };
     </script>
 </body>
 </html>
