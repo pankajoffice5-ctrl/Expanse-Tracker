@@ -6,6 +6,11 @@
     <title>Expanse Tracker | 3-Month Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom scrollbar for the search list */
+        #cat-list::-webkit-scrollbar { width: 4px; }
+        #cat-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
 </head>
 <body class="bg-slate-50 min-h-screen font-sans">
 
@@ -27,22 +32,22 @@
             </div>
             <div class="text-right">
                 <p class="text-[10px] font-bold text-slate-400 uppercase">Lifetime Spend</p>
-                <h2 id="total-amount" class="text-xl font-black text-slate-800">$0.00</h2>
+                <h2 id="total-amount" class="text-xl font-black text-slate-800">0.00</h2>
             </div>
         </header>
 
         <section class="p-4 grid grid-cols-3 gap-2">
             <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm text-center">
                 <p id="m2-name" class="text-[9px] font-bold text-slate-400 uppercase">--</p>
-                <h3 id="m2-total" class="text-sm font-black text-slate-700">$0</h3>
+                <h3 id="m2-total" class="text-sm font-black text-slate-700">0</h3>
             </div>
             <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm text-center border-b-4 border-b-blue-200">
                 <p id="m1-name" class="text-[9px] font-bold text-slate-400 uppercase">--</p>
-                <h3 id="m1-total" class="text-sm font-black text-slate-700">$0</h3>
+                <h3 id="m1-total" class="text-sm font-black text-slate-700">0</h3>
             </div>
             <div class="bg-blue-600 p-3 rounded-2xl shadow-md text-center text-white">
                 <p class="text-[9px] font-bold uppercase opacity-80">This Month</p>
-                <h3 id="curr-total" class="text-sm font-black">$0</h3>
+                <h3 id="curr-total" class="text-sm font-black">0</h3>
             </div>
         </section>
 
@@ -57,29 +62,22 @@
         <section class="px-4 pb-4">
             <div class="bg-white rounded-2xl border p-5 shadow-sm">
                 <form id="expense-form" class="space-y-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <select id="category" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
-                            <option value="Grocery">🛒 Grocery</option>
-                            <option value="Medical">🏥 Medical</option>
-                            <option value="Shopping">🛍️ Shopping</option>
-                            <option value="Food & Drink">🍽️ Food & Drink</option>
-                            <option value="Water">💧 Water</option>
-                            <option value="Gas">🔥 Gas</option>
-                            <option value="Transportation">🚌 Transportation</option>
-                            <option value="Rent">🏠 Rent</option>
-                            <option value="Phone & Internet">📱 Phone & Internet</option>
-                            <option value="Cloths">👕 Cloths</option>
-                            <option value="Entertainment">🎬 Entertainment</option>
-                            <option value="Nevta">🎁 Nevta</option>
-                            <option value="Other">📦 Other</option>
-                        </select>
-                        <input type="date" id="exp-date" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
+                    <div class="grid grid-cols-2 gap-3 relative">
+                        <div class="relative col-span-1">
+                            <input type="text" id="cat-search" placeholder="Search Category..." 
+                                class="w-full bg-slate-50 rounded-xl p-3 text-sm outline-none border border-transparent focus:border-blue-300" autocomplete="off">
+                            <div id="cat-list" class="hidden absolute top-full left-0 w-full bg-white border shadow-xl rounded-xl mt-1 z-50 max-h-48 overflow-y-auto p-1">
+                                </div>
+                            <input type="hidden" id="selected-category" required>
+                        </div>
+                        <input type="date" id="exp-date" class="bg-slate-50 rounded-xl p-3 text-sm outline-none border border-transparent focus:border-blue-300">
                     </div>
+                    
                     <div class="grid grid-cols-3 gap-3">
                         <input type="number" step="0.01" id="amount" placeholder="0.00" class="col-span-1 bg-slate-50 rounded-xl p-3 text-sm" required>
                         <input type="text" id="desc" placeholder="Description" class="col-span-2 bg-slate-50 rounded-xl p-3 text-sm" required>
                     </div>
-                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all">Add Expense</button>
+                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all active:scale-95">Add Expense</button>
                 </form>
             </div>
         </section>
@@ -109,48 +107,69 @@
         let myChart = null;
         let currentUser = null;
 
-        // --- DEV TOGGLE: Change to 'true' to skip login for local design work ---
-        const BYPASS_LOGIN = false; 
+        const categories = [
+            "🛒 Grocery", "🏥 Medical", "🛍️ Shopping", "🍽️ Food & Drink", 
+            "💧 Water", "🔥 Gas", "🚌 Transportation", "🏠 Rent", 
+            "📱 Phone & Internet", "👕 Cloths", "🎬 Entertainment", "🎁 Nevta", "📦 Other"
+        ];
 
-        document.getElementById('exp-date').valueAsDate = new Date();
+        // --- Category Search Logic ---
+        const catSearch = document.getElementById('cat-search');
+        const catList = document.getElementById('cat-list');
+        const hiddenCat = document.getElementById('selected-category');
 
-        // Handle Login Bypass or Real Auth
-        if (BYPASS_LOGIN) {
-            currentUser = { uid: "test_user_local" };
-            setupUI();
-        } else {
-            onAuthStateChanged(auth, (user) => {
-                if (user) {
-                    currentUser = user;
-                    setupUI();
-                } else {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    document.getElementById('app-content').classList.add('hidden');
-                }
-            });
+        function renderCategories(filter = "") {
+            const filtered = categories.filter(c => c.toLowerCase().includes(filter.toLowerCase()));
+            catList.innerHTML = filtered.map(c => 
+                `<div class="p-3 hover:bg-blue-50 cursor-pointer rounded-lg text-sm font-medium text-slate-700" onclick="selectCategory('${c}')">${c}</div>`
+            ).join('');
         }
+
+        catSearch.onfocus = () => { renderCategories(); catList.classList.remove('hidden'); };
+        catSearch.oninput = (e) => renderCategories(e.target.value);
+        
+        window.selectCategory = (val) => {
+            catSearch.value = val;
+            hiddenCat.value = val;
+            catList.classList.add('hidden');
+        };
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!catSearch.contains(e.target) && !catList.contains(e.target)) catList.classList.add('hidden');
+        });
+
+        // --- Auth & Data Logic ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                setupUI();
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('app-content').classList.add('hidden');
+            }
+        });
 
         function setupUI() {
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-content').classList.remove('hidden');
+            document.getElementById('exp-date').valueAsDate = new Date();
             initChart();
             loadUserData(currentUser.uid);
         }
-
-        document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
-        document.getElementById('logout-btn').onclick = () => BYPASS_LOGIN ? location.reload() : signOut(auth);
 
         function initChart() {
             const ctx = document.getElementById('expenseChart').getContext('2d');
             if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'], borderWidth: 0 }] },
                 options: { cutout: '75%', plugins: { legend: { display: false } } }
             });
         }
 
         function loadUserData(uid) {
+            // NOTE: If this fails, click the link in your browser console to create the index
             const q = query(collection(db, 'expenses'), where("userId", "==", uid), orderBy('createdAt', 'desc'));
             
             onSnapshot(q, (snapshot) => {
@@ -160,17 +179,8 @@
 
                 const now = new Date();
                 const m0 = now.getMonth(), y0 = now.getFullYear();
-                
-                // Better month calculation to avoid "31st" date errors
-                const dateM1 = new Date(y0, m0 - 1, 1);
-                const m1 = dateM1.getMonth(), y1 = dateM1.getFullYear();
-                
-                const dateM2 = new Date(y0, m0 - 2, 1);
-                const m2 = dateM2.getMonth(), y2 = dateM2.getFullYear();
-
-                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                document.getElementById('m1-name').innerText = monthNames[m1];
-                document.getElementById('m2-name').innerText = monthNames[m2];
+                const d1 = new Date(y0, m0 - 1, 1);
+                const d2 = new Date(y0, m0 - 2, 1);
 
                 snapshot.docs.forEach(doc => {
                     const item = doc.data();
@@ -182,18 +192,18 @@
                     if (date.getMonth() === m0 && date.getFullYear() === y0) {
                         totals.current += amount;
                         catTotals[item.category] = (catTotals[item.category] || 0) + amount;
-                    } else if (date.getMonth() === m1 && date.getFullYear() === y1) {
+                    } else if (date.getMonth() === d1.getMonth() && date.getFullYear() === d1.getFullYear()) {
                         totals.last1 += amount;
-                    } else if (date.getMonth() === m2 && date.getFullYear() === y2) {
+                    } else if (date.getMonth() === d2.getMonth() && date.getFullYear() === d2.getFullYear()) {
                         totals.last2 += amount;
                     }
-
-                    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 
                     html += `
                         <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm border border-slate-100">
                             <div class="flex items-center gap-3">
-                                <div class="bg-slate-100 text-[9px] font-bold p-2 rounded-lg text-slate-500 text-center uppercase">${dateStr.replace(' ', '<br>')}</div>
+                                <div class="bg-slate-100 text-[9px] font-bold p-2 rounded-lg text-slate-500 text-center uppercase">
+                                    ${date.toLocaleDateString('en-GB', {day:'2-digit', month:'short'}).replace(' ', '<br>')}
+                                </div>
                                 <div>
                                     <p class="text-sm font-bold text-slate-800">${item.description}</p>
                                     <p class="text-[10px] text-slate-400 uppercase tracking-tighter">${item.category}</p>
@@ -211,7 +221,9 @@
                 document.getElementById('curr-total').innerText = `$${Math.round(totals.current)}`;
                 document.getElementById('m1-total').innerText = `$${Math.round(totals.last1)}`;
                 document.getElementById('m2-total').innerText = `$${Math.round(totals.last2)}`;
-                
+                document.getElementById('m1-name').innerText = d1.toLocaleString('default', { month: 'short' });
+                document.getElementById('m2-name').innerText = d2.toLocaleString('default', { month: 'short' });
+
                 myChart.data.labels = Object.keys(catTotals);
                 myChart.data.datasets[0].data = Object.values(catTotals);
                 myChart.update();
@@ -220,21 +232,28 @@
 
         document.getElementById('expense-form').onsubmit = async (e) => {
             e.preventDefault();
-            const selectedDate = new Date(document.getElementById('exp-date').value);
-            selectedDate.setHours(new Date().getHours(), new Date().getMinutes());
+            const date = new Date(document.getElementById('exp-date').value);
+            date.setHours(new Date().getHours(), new Date().getMinutes());
+
+            if(!hiddenCat.value) { alert("Please select a category"); return; }
 
             await addDoc(collection(db, 'expenses'), {
                 userId: currentUser.uid,
-                category: document.getElementById('category').value,
+                category: hiddenCat.value,
                 description: document.getElementById('desc').value,
                 amount: parseFloat(document.getElementById('amount').value),
-                createdAt: Timestamp.fromDate(selectedDate)
+                createdAt: Timestamp.fromDate(date)
             });
+            
             e.target.reset();
+            catSearch.value = "";
+            hiddenCat.value = "";
             document.getElementById('exp-date').valueAsDate = new Date();
         };
 
-        window.deleteItem = (id) => { if(confirm("Delete this item?")) deleteDoc(doc(db, 'expenses', id)); };
+        window.deleteItem = (id) => { if(confirm("Delete?")) deleteDoc(doc(db, 'expenses', id)); };
+        document.getElementById('login-btn').onclick = () => signInWithPopup(auth, provider);
+        document.getElementById('logout-btn').onclick = () => signOut(auth);
     </script>
 </body>
 </html>
