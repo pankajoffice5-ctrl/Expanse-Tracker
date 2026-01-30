@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expanse Tracker | 3-Month Analytics</title>
+    <title>Expanse Tracker | Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Custom scrollbar for the search list */
         #cat-list::-webkit-scrollbar { width: 4px; }
         #cat-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
@@ -16,9 +15,8 @@
 
     <div id="login-screen" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-6 text-center">
         <div class="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl">
-            <h2 class="text-3xl font-black mb-2 text-slate-800">Welcome to Smart Calc</h2>
-            <p class="text-slate-500 mb-6">Login to track spending trends.</p>
-            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all">
+            <h2 class="text-3xl font-black mb-2 text-slate-800">Welcome to smart calc</h2>
+            <button id="login-btn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-all">
                 Sign in with Google
             </button>
         </div>
@@ -66,18 +64,17 @@
                         <div class="relative col-span-1">
                             <input type="text" id="cat-search" placeholder="Search Category..." 
                                 class="w-full bg-slate-50 rounded-xl p-3 text-sm outline-none border border-transparent focus:border-blue-300" autocomplete="off">
-                            <div id="cat-list" class="hidden absolute top-full left-0 w-full bg-white border shadow-xl rounded-xl mt-1 z-50 max-h-48 overflow-y-auto p-1">
-                                </div>
+                            <div id="cat-list" class="hidden absolute top-full left-0 w-full bg-white border shadow-xl rounded-xl mt-1 z-50 max-h-48 overflow-y-auto p-1"></div>
                             <input type="hidden" id="selected-category" required>
                         </div>
-                        <input type="date" id="exp-date" class="bg-slate-50 rounded-xl p-3 text-sm outline-none border border-transparent focus:border-blue-300">
+                        <input type="date" id="exp-date" class="bg-slate-50 rounded-xl p-3 text-sm outline-none">
                     </div>
                     
                     <div class="grid grid-cols-3 gap-3">
                         <input type="number" step="0.01" id="amount" placeholder="0.00" class="col-span-1 bg-slate-50 rounded-xl p-3 text-sm" required>
                         <input type="text" id="desc" placeholder="Description" class="col-span-2 bg-slate-50 rounded-xl p-3 text-sm" required>
                     </div>
-                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all active:scale-95">Add Expense</button>
+                    <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-black transition-all">Add Expense</button>
                 </form>
             </div>
         </section>
@@ -90,6 +87,7 @@
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
+        // Use your config from previous steps
         const firebaseConfig = {
             apiKey: "AIzaSyCDd-I_OFsCNreuUVbtfUFK-2IDGkhqHAE",
             authDomain: "expanse-trac-e3e40.firebaseapp.com",
@@ -107,47 +105,25 @@
         let myChart = null;
         let currentUser = null;
 
-        const categories = [
-            "🛒 Grocery", "🏥 Medical", "🛍️ Shopping", "🍽️ Food & Drink", 
-            "💧 Water", "🔥 Gas", "🚌 Transportation", "🏠 Rent", 
-            "📱 Phone & Internet", "👕 Cloths", "🎬 Entertainment", "🎁 Nevta", "📦 Other"
-        ];
+        const categories = ["🛒 Grocery", "🏥 Medical", "🛍️ Shopping", "🍽️ Food & Drink", "💧 Water", "🔥 Gas", "🚌 Transportation", "🏠 Rent", "📱 Phone & Internet", "👕 Cloths", "🎬 Entertainment", "🎁 Nevta", "📦 Other"];
 
-        // --- Category Search Logic ---
+        // Category Search Helper
         const catSearch = document.getElementById('cat-search');
         const catList = document.getElementById('cat-list');
         const hiddenCat = document.getElementById('selected-category');
 
         function renderCategories(filter = "") {
             const filtered = categories.filter(c => c.toLowerCase().includes(filter.toLowerCase()));
-            catList.innerHTML = filtered.map(c => 
-                `<div class="p-3 hover:bg-blue-50 cursor-pointer rounded-lg text-sm font-medium text-slate-700" onclick="selectCategory('${c}')">${c}</div>`
-            ).join('');
+            catList.innerHTML = filtered.map(c => `<div class="p-3 hover:bg-blue-50 cursor-pointer rounded-lg text-sm font-medium" onclick="selectCategory('${c}')">${c}</div>`).join('');
         }
 
         catSearch.onfocus = () => { renderCategories(); catList.classList.remove('hidden'); };
         catSearch.oninput = (e) => renderCategories(e.target.value);
-        
-        window.selectCategory = (val) => {
-            catSearch.value = val;
-            hiddenCat.value = val;
-            catList.classList.add('hidden');
-        };
+        window.selectCategory = (val) => { catSearch.value = val; hiddenCat.value = val; catList.classList.add('hidden'); };
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!catSearch.contains(e.target) && !catList.contains(e.target)) catList.classList.add('hidden');
-        });
-
-        // --- Auth & Data Logic ---
         onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                setupUI();
-            } else {
-                document.getElementById('login-screen').classList.remove('hidden');
-                document.getElementById('app-content').classList.add('hidden');
-            }
+            if (user) { currentUser = user; setupUI(); } 
+            else { document.getElementById('login-screen').classList.remove('hidden'); document.getElementById('app-content').classList.add('hidden'); }
         });
 
         function setupUI() {
@@ -160,27 +136,21 @@
 
         function initChart() {
             const ctx = document.getElementById('expenseChart').getContext('2d');
-            if (myChart) myChart.destroy();
             myChart = new Chart(ctx, {
                 type: 'doughnut',
-                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'], borderWidth: 0 }] },
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }] },
                 options: { cutout: '75%', plugins: { legend: { display: false } } }
             });
         }
 
         function loadUserData(uid) {
-            // NOTE: If this fails, click the link in your browser console to create the index
             const q = query(collection(db, 'expenses'), where("userId", "==", uid), orderBy('createdAt', 'desc'));
             
             onSnapshot(q, (snapshot) => {
                 let totals = { lifetime: 0, current: 0, last1: 0, last2: 0 };
                 let catTotals = {};
                 let html = '';
-
                 const now = new Date();
-                const m0 = now.getMonth(), y0 = now.getFullYear();
-                const d1 = new Date(y0, m0 - 1, 1);
-                const d2 = new Date(y0, m0 - 2, 1);
 
                 snapshot.docs.forEach(doc => {
                     const item = doc.data();
@@ -188,14 +158,9 @@
                     const date = item.createdAt.toDate();
                     
                     totals.lifetime += amount;
-
-                    if (date.getMonth() === m0 && date.getFullYear() === y0) {
+                    if (date.getMonth() === now.getMonth()) {
                         totals.current += amount;
                         catTotals[item.category] = (catTotals[item.category] || 0) + amount;
-                    } else if (date.getMonth() === d1.getMonth() && date.getFullYear() === d1.getFullYear()) {
-                        totals.last1 += amount;
-                    } else if (date.getMonth() === d2.getMonth() && date.getFullYear() === d2.getFullYear()) {
-                        totals.last2 += amount;
                     }
 
                     html += `
@@ -206,48 +171,41 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-bold text-slate-800">${item.description}</p>
-                                    <p class="text-[10px] text-slate-400 uppercase tracking-tighter">${item.category}</p>
+                                    <p class="text-[10px] text-slate-400 uppercase">${item.category}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-4">
-                                <span class="font-black text-slate-900">$${amount.toFixed(2)}</span>
+                                <span class="font-black text-slate-900">${amount.toFixed(2)}</span>
                                 <button onclick="deleteItem('${doc.id}')" class="text-slate-200 hover:text-red-500">✕</button>
                             </div>
                         </div>`;
                 });
 
-                document.getElementById('expense-list').innerHTML = html || '<p class="text-center text-slate-400 py-10 text-sm">No expenses yet.</p>';
-                document.getElementById('total-amount').innerText = `$${totals.lifetime.toFixed(2)}`;
-                document.getElementById('curr-total').innerText = `$${Math.round(totals.current)}`;
-                document.getElementById('m1-total').innerText = `$${Math.round(totals.last1)}`;
-                document.getElementById('m2-total').innerText = `$${Math.round(totals.last2)}`;
-                document.getElementById('m1-name').innerText = d1.toLocaleString('default', { month: 'short' });
-                document.getElementById('m2-name').innerText = d2.toLocaleString('default', { month: 'short' });
-
+                document.getElementById('expense-list').innerHTML = html;
+                document.getElementById('total-amount').innerText = totals.lifetime.toFixed(2);
+                document.getElementById('curr-total').innerText = Math.round(totals.current);
+                
                 myChart.data.labels = Object.keys(catTotals);
                 myChart.data.datasets[0].data = Object.values(catTotals);
                 myChart.update();
+            }, (err) => {
+                // This catches the error shown in your image_198b81.png
+                if(err.code === 'failed-precondition') {
+                    console.error("Index required. Click the link in the browser console error message to fix this!");
+                }
             });
         }
 
         document.getElementById('expense-form').onsubmit = async (e) => {
             e.preventDefault();
-            const date = new Date(document.getElementById('exp-date').value);
-            date.setHours(new Date().getHours(), new Date().getMinutes());
-
-            if(!hiddenCat.value) { alert("Please select a category"); return; }
-
             await addDoc(collection(db, 'expenses'), {
                 userId: currentUser.uid,
                 category: hiddenCat.value,
                 description: document.getElementById('desc').value,
                 amount: parseFloat(document.getElementById('amount').value),
-                createdAt: Timestamp.fromDate(date)
+                createdAt: Timestamp.fromDate(new Date(document.getElementById('exp-date').value))
             });
-            
             e.target.reset();
-            catSearch.value = "";
-            hiddenCat.value = "";
             document.getElementById('exp-date').valueAsDate = new Date();
         };
 
